@@ -1,9 +1,10 @@
 import oscP5.*;
 import netP5.*;
-import java.awt.*; 
-import java.awt.event.*; 
-import javax.swing.*; 
+import java.awt.*;
+import java.awt.event.*;
+import javax.swing.*;
 import javax.swing.event.*;
+import java.util.Date;
 
 boolean connected = false;
 int MY_OSC_PORT = -1;
@@ -27,7 +28,7 @@ void setup() {
   surface.setVisible(false);
 
   loadConfig();
-  
+
   GuiListener listener = new GuiListener(this);
 
   JPanel panel = new JPanel();
@@ -42,7 +43,7 @@ void setup() {
   panel.add(myPort);
 
   {
-    JLabel l = new JLabel("My OSC Port"); 
+    JLabel l = new JLabel("My OSC Port");
     l.setBounds(
         20 + 2, 10 + 25, 150, 30);
     panel.add(l);
@@ -50,7 +51,7 @@ void setup() {
 
   // 接続ボタン
   bindButton = new JButton("Connect");
-  bindButton.addActionListener(listener); 
+  bindButton.addActionListener(listener);
   bindButton.setBounds(
     180, 10, 150, 30);
   panel.add(bindButton);
@@ -58,17 +59,21 @@ void setup() {
   // デバッグ表示用エリア
   logTextArea = new JTextArea();
   logTextArea.setLineWrap(true);
-  logTextArea.setPreferredSize(new Dimension(450, 400));
-  logTextArea.setBounds(
+  JScrollPane scrollpane = new JScrollPane(
+      logTextArea,
+      JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
+      JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
+  scrollpane.setPreferredSize(new Dimension(450, 400));
+  scrollpane.setBounds(
       20, 70, 680, 300);
-  panel.add(logTextArea);
+  panel.add(scrollpane);
 
   // 表示用フレーム
-  JFrame f = new JFrame("Osc Receiver"); 
+  JFrame f = new JFrame("Osc Receiver");
   f.add(panel);
-  f.setSize(W_WIDTH, W_HEIGHT); 
+  f.setSize(W_WIDTH, W_HEIGHT);
   f.setVisible(true);
-  
+
   logText = "";
 }
 
@@ -96,7 +101,7 @@ void connect() {
     oscP5.dispose();
     oscP5 = null;
   }
-  
+
   // OSCの接続開始
   oscP5 = new OscP5(this, MY_OSC_PORT);
   connected = true;
@@ -117,7 +122,7 @@ void disconnect() {
  *
  */
 void oscEvent(OscMessage _msg) {
-  logText += "[oscEvent]" + parseOscMessageToString(_msg) + "\r\n";
+  logText = "[" +(new Date().toString()) + "]" + parseOscMessageToString(_msg) + "\r\n" + logText;
   logTextArea.setText(logText);
 }
 
