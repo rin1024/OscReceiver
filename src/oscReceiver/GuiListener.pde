@@ -52,6 +52,10 @@ class GuiListener implements ItemListener, ChangeListener, ActionListener, KeyLi
         bindButton.setText("Disconnect");
 
         logText = "[" +(new Date().toString()) + "]connect osc port = " + MY_OSC_PORT + ".\r\n" + logText;
+
+        // save last selected port
+        config.setInt("myOscPort", MY_OSC_PORT);
+        saveJSONObject(config, dataPath("config.json"));
       }
       logTextArea.setText(logText);
     }
