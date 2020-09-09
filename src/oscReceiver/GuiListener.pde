@@ -32,17 +32,26 @@ class GuiListener implements ItemListener, ChangeListener, ActionListener, KeyLi
   }
 
   void actionPerformed(ActionEvent e) {
+    // clearボタンが押された
+    if (e.getSource() == clearButton) {
+      logText = "";
+      logTextArea.setText(logText);
+    }
     // 接続ボタンが押された
-    if (e.getSource() == bindButton) {
+    else if (e.getSource() == bindButton) {
       if (connected == true) {
         disconnect();
         bindButton.setText("Connect");
-        logText += "disconnect." + "\r\n";
+        
+        logText = "[" +(new Date().toString()) + "]disconnect.\r\n" + logText;
       }
       else {
+        MY_OSC_PORT = Integer.parseInt(myPort.getText());
+
         connect();
         bindButton.setText("Disconnect");
-        logText += "connect osc port = " + MY_OSC_PORT + ".\r\n";
+
+        logText = "[" +(new Date().toString()) + "]connect osc port = " + MY_OSC_PORT + ".\r\n" + logText;
       }
       logTextArea.setText(logText);
     }

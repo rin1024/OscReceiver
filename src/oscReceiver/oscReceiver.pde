@@ -17,6 +17,7 @@ JSONObject config;
 
 JTextField myPort;
 JButton bindButton;
+JButton clearButton;
 JTextArea logTextArea;
 
 String logText;
@@ -55,6 +56,13 @@ void setup() {
   bindButton.setBounds(
     180, 10, 150, 30);
   panel.add(bindButton);
+
+  // clearボタン
+  clearButton = new JButton("Clear");
+  clearButton.addActionListener(listener);
+  clearButton.setBounds(
+    550, 10, 150, 30);
+  panel.add(clearButton);
 
   // デバッグ表示用エリア
   logTextArea = new JTextArea();
