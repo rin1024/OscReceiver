@@ -34,8 +34,8 @@ class GuiListener implements ItemListener, ChangeListener, ActionListener, KeyLi
   void actionPerformed(ActionEvent e) {
     // clearボタンが押された
     if (e.getSource() == clearButton) {
-      logText = "";
-      logTextArea.setText(logText);
+      logText.clear();
+      logTextArea.setText("");
     }
     // 接続ボタンが押された
     else if (e.getSource() == bindButton) {
@@ -43,7 +43,7 @@ class GuiListener implements ItemListener, ChangeListener, ActionListener, KeyLi
         disconnect();
         bindButton.setText("Connect");
         
-        logText = "[" +(new Date().toString()) + "]disconnect.\r\n" + logText;
+        logText.add(0, "[" +(new Date().toString()) + "]disconnect.");
       }
       else {
         MY_OSC_PORT = Integer.parseInt(myPort.getText());
@@ -51,13 +51,13 @@ class GuiListener implements ItemListener, ChangeListener, ActionListener, KeyLi
         connect();
         bindButton.setText("Disconnect");
 
-        logText = "[" +(new Date().toString()) + "]connect osc port = " + MY_OSC_PORT + ".\r\n" + logText;
+        logText.add(0, "[" +(new Date().toString()) + "]connect osc port = " + MY_OSC_PORT);
 
         // save last selected port
         config.setInt("myOscPort", MY_OSC_PORT);
         saveJSONObject(config, dataPath("config.json"));
       }
-      logTextArea.setText(logText);
+      logTextArea.setText(String.join("\r\n", logText));
     }
   }
 }  

@@ -5,6 +5,8 @@ import java.awt.event.*;
 import javax.swing.*;
 import javax.swing.event.*;
 import java.util.Date;
+import java.util.StringJoiner ; 
+import java.util.Arrays ;
 
 boolean connected = false;
 int MY_OSC_PORT = -1;
@@ -20,7 +22,7 @@ JButton bindButton;
 JButton clearButton;
 JTextArea logTextArea;
 
-String logText;
+ArrayList<String> logText;
 
 /**
  *
@@ -82,7 +84,7 @@ void setup() {
   f.setSize(W_WIDTH, W_HEIGHT);
   f.setVisible(true);
 
-  logText = "";
+  logText = new ArrayList<String>();
 }
 
 /**
@@ -130,8 +132,11 @@ void disconnect() {
  *
  */
 void oscEvent(OscMessage _msg) {
-  logText = "[" +(new Date().toString()) + "]" + parseOscMessageToString(_msg) + "\r\n" + logText;
-  logTextArea.setText(logText);
+  logText.add(0, "[" +(new Date().toString()) + "]" + parseOscMessageToString(_msg));
+  logTextArea.setText(String.join("\r\n", logText));
+  if (logText.size() > 1000) {
+    logText.remove(logText.size() - 1);
+  }
 }
 
 /**
