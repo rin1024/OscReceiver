@@ -113,7 +113,10 @@ void connect() {
   }
 
   // OSCの接続開始
-  oscP5 = new OscP5(this, MY_OSC_PORT);
+  OscProperties properties = new OscProperties();
+  properties.setDatagramSize(100000); //1536
+  properties.setListeningPort(MY_OSC_PORT);
+  oscP5 = new OscP5(this, properties);
   connected = true;
 }
 
@@ -149,11 +152,11 @@ String parseOscMessageToString(OscMessage _msg) {
   String txt = _addr + ": ";
   for (int i=0;i<_list.length;i++) {
     try {
-      txt += Integer.valueOf((String) _list[i]);
+      txt += "[" + Integer.valueOf((String) _list[i]) + "]";
     }
     catch (Exception e) {
       try {
-        txt += _list[i].toString();
+        txt += "[" + _list[i].toString() + "]";
       }
       catch (Exception e2) {
         println(e2);
