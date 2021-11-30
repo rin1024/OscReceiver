@@ -1,3 +1,7 @@
-*~
-.swp
+*.log
+*.log.*
+*.swp
+*.un~
 .DS_Store
+*.md~
+*.pde~
