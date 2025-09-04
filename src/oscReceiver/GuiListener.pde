@@ -43,7 +43,7 @@ class GuiListener implements ItemListener, ChangeListener, ActionListener, KeyLi
         disconnect();
         bindButton.setText("Connect");
         
-        logText.add(0, "[" +(new Date().toString()) + "]disconnect.");
+        logText.add(0, "[" +getFormattedDate() + "]disconnect.");
       }
       else {
         MY_OSC_PORT = Integer.parseInt(myPort.getText());
@@ -51,7 +51,7 @@ class GuiListener implements ItemListener, ChangeListener, ActionListener, KeyLi
         connect();
         bindButton.setText("Disconnect");
 
-        logText.add(0, "[" +(new Date().toString()) + "]connect osc port = " + MY_OSC_PORT);
+        logText.add(0, "[" +getFormattedDate() + "]connect osc port = " + MY_OSC_PORT);
 
         // save last selected port
         config.setInt("myOscPort", MY_OSC_PORT);

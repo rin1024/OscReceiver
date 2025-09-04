@@ -2,6 +2,8 @@ import java.awt.*;
 import java.awt.event.*;
 import javax.swing.*;
 import javax.swing.event.*;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.StringJoiner ; 
 import java.util.Arrays ;
@@ -10,6 +12,8 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
 import oscP5.*;
 import processing.awt.*;
+
+final Logger L = Logger.getLogger(getClass());
 
 boolean connected = false;
 int MY_OSC_PORT = -1;
@@ -34,7 +38,8 @@ ArrayList<String> logText = new ArrayList<String>();
 void settings() {
   System.setProperty("logging.dir", dataPath("../log/"));
   PropertyConfigurator.configure(dataPath("log4j.properties"));
-  logText.add(0, "[" +(new Date().toString()) + "]logging.dir = " + dataPath("../log/"));
+
+  logText.add(0, "[" +getFormattedDate() + "]logging.dir = " + dataPath("../log/"));
 
   loadConfig();
   size(W_WIDTH, W_HEIGHT);
@@ -147,7 +152,7 @@ void disconnect() {
  *
  */
 void oscEvent(OscMessage _msg) {
-  logText.add(0, "[" +(new Date().toString()) + "]" + parseOscMessageToString(_msg));
+  logText.add(0, "[" +getFormattedDate() + "]" + parseOscMessageToString(_msg));
   logTextArea.setText(String.join("\r\n", logText));
   if (logText.size() > 1000) {
     logText.remove(logText.size() - 1);
@@ -171,10 +176,16 @@ String parseOscMessageToString(OscMessage _msg) {
         txt += "[" + _list[i].toString() + "]";
       }
       catch (Exception e2) {
-        println(e2);
+        logText.add("[parseOscMessageToString exception]" + e2);
       }
     }
     txt += ",  ";
   }
   return txt;
+}
+
+String getFormattedDate() {
+  DateFormat format = new SimpleDateFormat("yyyy/MM/dd hh:mm:ss.SSS");
+  String date = format.format(new Date());
+  return date;
 }
