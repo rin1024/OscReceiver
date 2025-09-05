@@ -23,10 +23,11 @@ final int MAX_PORTS = 3;
 OscP5[] oscServers = new OscP5[MAX_PORTS];
 int[] portNumbers = new int[MAX_PORTS];
 boolean[] portConnected = new boolean[MAX_PORTS];
-String[] portLabels = {"Port 1", "Port 2", "Port 3"};
+String[] portLabelTexts = {"Port 1", "Port 2", "Port 3"};
+int currentPortCount = 1; // 現在表示されているポート数
 
-static int W_WIDTH = 720;
-static int W_HEIGHT = 410;
+static int W_WIDTH = 800;
+static int W_HEIGHT = 450;
 
 OscP5 oscP5;
 JSONObject config;
@@ -35,10 +36,15 @@ int bgColor;
 JTextField[] portTextFields = new JTextField[MAX_PORTS];
 JButton[] connectButtons = new JButton[MAX_PORTS];
 JButton clearButton;
-JTextArea logTextArea;
+JButton addPortButton;
+JButton removePortButton;
+JTextArea[] logTextAreas = new JTextArea[MAX_PORTS];
 JLabel[] portStatusLabels = new JLabel[MAX_PORTS];
+JScrollPane[] portScrollPanes = new JScrollPane[MAX_PORTS];
+JLabel[] portLabels = new JLabel[MAX_PORTS];
 
 ArrayList<String> logText = new ArrayList<String>();
+ArrayList<String>[] portLogTexts = new ArrayList[MAX_PORTS];
 
 /**
  *
@@ -62,54 +68,30 @@ void setup() {
 
   GuiListener listener = new GuiListener(this);
 
-  // 複数ポートのUIを作成
-  for (int i = 0; i < MAX_PORTS; i++) {
-    int yPos = 10 + i * 50;
-    
-    // ポート番号入力フィールド
-    portTextFields[i] = new JTextField();
-    portTextFields[i].addKeyListener(listener);
-    portTextFields[i].setText(Integer.toString(portNumbers[i]));
-    portTextFields[i].setBounds(20, yPos, 100, 25);
-    pane.add(portTextFields[i]);
+  // ポート管理ボタン
+  addPortButton = new JButton("+");
+  addPortButton.addActionListener(listener);
+  addPortButton.setBounds(20, 10, 30, 25);
+  pane.add(addPortButton);
 
-    // ポートラベル
-    JLabel portLabel = new JLabel(portLabels[i]);
-    portLabel.setBounds(20, yPos + 25, 100, 20);
-    pane.add(portLabel);
+  removePortButton = new JButton("-");
+  removePortButton.addActionListener(listener);
+  removePortButton.setBounds(55, 10, 30, 25);
+  pane.add(removePortButton);
 
-    // 接続ボタン
-    connectButtons[i] = new JButton("Connect");
-    connectButtons[i].addActionListener(listener);
-    connectButtons[i].setBounds(130, yPos, 80, 25);
-    pane.add(connectButtons[i]);
+  // ポート数表示ラベル
+  JLabel portCountLabel = new JLabel("Ports: 1");
+  portCountLabel.setBounds(90, 10, 80, 25);
+  pane.add(portCountLabel);
 
-    // ステータスラベル
-    portStatusLabels[i] = new JLabel("Disconnected");
-    portStatusLabels[i].setBounds(220, yPos, 100, 25);
-    portStatusLabels[i].setForeground(Color.RED);
-    pane.add(portStatusLabels[i]);
-  }
+  // 初期ポート表示
+  updatePortDisplay();
 
   // clearボタン
   clearButton = new JButton("Clear All");
   clearButton.addActionListener(listener);
-  clearButton.setBounds(550, 10, 150, 30);
+  clearButton.setBounds(650, 10, 120, 30);
   pane.add(clearButton);
-
-  // デバッグ表示用エリア
-  logTextArea = new JTextArea();
-  logTextArea.setLineWrap(true);
-  JScrollPane scrollpane = new JScrollPane(
-      logTextArea,
-      JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
-      JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
-  scrollpane.setPreferredSize(new Dimension(450, 300));
-  scrollpane.setBounds(
-      20, 170, 680, (height - 170) - 20);
-  pane.add(scrollpane);
-
-  logTextArea.setText(String.join("\r\n", logText));
 
   // set background color
   bgColor = canvas.getBackground().getRGB();
@@ -128,6 +110,14 @@ void draw() {
  */
 void loadConfig() {
   config = loadJSONObject(dataPath("config.json"));
+
+  // ポート数の設定を読み込み
+  if (config.hasKey("portCount")) {
+    currentPortCount = config.getInt("portCount");
+    currentPortCount = constrain(currentPortCount, 1, MAX_PORTS);
+  } else {
+    currentPortCount = 1; // デフォルトは1ポート
+  }
 
   // 複数ポートの設定を読み込み
   if (config.hasKey("ports")) {
@@ -180,14 +170,16 @@ void connectPort(int portIndex) {
     portStatusLabels[portIndex].setForeground(Color.GREEN);
     
     logText.add(0, "[" + getFormattedDate() + "]Port " + (portIndex + 1) + " connected on " + portNumber);
-    updateLogDisplay();
+    portLogTexts[portIndex].add(0, "[" + getFormattedDate() + "]Connected on port " + portNumber);
+    updatePortLogDisplay(portIndex);
     
     // 設定を保存
     saveConfig();
     
   } catch (Exception e) {
     logText.add(0, "[" + getFormattedDate() + "]Port " + (portIndex + 1) + " connection failed: " + e.getMessage());
-    updateLogDisplay();
+    portLogTexts[portIndex].add(0, "[" + getFormattedDate() + "]Connection failed: " + e.getMessage());
+    updatePortLogDisplay(portIndex);
   }
 }
 
@@ -213,7 +205,8 @@ void disconnectPort(int portIndex) {
     portStatusLabels[portIndex].setForeground(Color.RED);
     
     logText.add(0, "[" + getFormattedDate() + "]Port " + (portIndex + 1) + " disconnected");
-    updateLogDisplay();
+    portLogTexts[portIndex].add(0, "[" + getFormattedDate() + "]Disconnected");
+    updatePortLogDisplay(portIndex);
   }
 }
 
@@ -228,18 +221,28 @@ void disconnectAll() {
  */
 void oscEvent(OscMessage _msg) {
   // どのポートからメッセージが来たかを特定
-  int sourcePort = -1;
+  int sourcePortIndex = -1;
   for (int i = 0; i < MAX_PORTS; i++) {
     if (oscServers[i] != null && portConnected[i]) {
-      // ポート番号で特定（簡易実装）
-      sourcePort = portNumbers[i];
+      sourcePortIndex = i;
       break;
     }
   }
   
-  String portInfo = sourcePort > 0 ? "[Port " + sourcePort + "] " : "";
-  logText.add(0, "[" + getFormattedDate() + "]" + portInfo + parseOscMessageToString(_msg));
-  updateLogDisplay();
+  if (sourcePortIndex >= 0) {
+    String logEntry = "[" + getFormattedDate() + "]" + parseOscMessageToString(_msg);
+    
+    // 該当ポートのログに追加
+    portLogTexts[sourcePortIndex].add(0, logEntry);
+    
+    // ログサイズを制限
+    if (portLogTexts[sourcePortIndex].size() > 100) {
+      portLogTexts[sourcePortIndex].remove(portLogTexts[sourcePortIndex].size() - 1);
+    }
+    
+    // 該当ポートのテキストエリアを更新
+    updatePortLogDisplay(sourcePortIndex);
+  }
 }
 
 /**
@@ -274,14 +277,149 @@ String getFormattedDate() {
 }
 
 /**
- * ログ表示を更新
+ * ログ表示を更新（後方互換性のため残している）
  */
 void updateLogDisplay() {
-  if (logTextArea != null) {
-    logTextArea.setText(String.join("\r\n", logText));
-    if (logText.size() > 1000) {
-      logText.remove(logText.size() - 1);
+  // このメソッドは後方互換性のため残しているが、実際は使用されない
+  // 各ポートのログは updatePortLogDisplay() で個別に更新される
+}
+
+/**
+ * 指定されたポートのログ表示を更新
+ */
+void updatePortLogDisplay(int portIndex) {
+  if (portIndex >= 0 && portIndex < MAX_PORTS && logTextAreas[portIndex] != null) {
+    logTextAreas[portIndex].setText(String.join("\r\n", portLogTexts[portIndex]));
+  }
+}
+
+/**
+ * ポート表示を更新
+ */
+void updatePortDisplay() {
+  Canvas canvas = (Canvas)surface.getNative();
+  JLayeredPane pane = (JLayeredPane)canvas.getParent().getParent();
+  
+  // 既存のポートUIを削除
+  for (int i = 0; i < MAX_PORTS; i++) {
+    if (portLabels[i] != null) {
+      pane.remove(portLabels[i]);
+      portLabels[i] = null;
     }
+    if (portTextFields[i] != null) {
+      pane.remove(portTextFields[i]);
+      portTextFields[i] = null;
+    }
+    if (connectButtons[i] != null) {
+      pane.remove(connectButtons[i]);
+      connectButtons[i] = null;
+    }
+    if (portStatusLabels[i] != null) {
+      pane.remove(portStatusLabels[i]);
+      portStatusLabels[i] = null;
+    }
+    if (portScrollPanes[i] != null) {
+      pane.remove(portScrollPanes[i]);
+      portScrollPanes[i] = null;
+      logTextAreas[i] = null;
+    }
+  }
+  
+  // 現在のポート数分だけUIを作成
+  for (int i = 0; i < currentPortCount; i++) {
+    int yPos = 40; // ボタンの下に配置
+    
+    // ポート数に応じて幅と位置を計算
+    int textAreaWidth, xPos;
+    if (currentPortCount == 1) {
+      // 1ポートの場合は画面幅いっぱい
+      textAreaWidth = W_WIDTH - 40; // 左右のマージン20pxずつ
+      xPos = 20;
+    } else if (currentPortCount == 2) {
+      // 2ポートの場合は2分割
+      textAreaWidth = (W_WIDTH - 60) / 2; // 左右のマージン20px + 中央の間隔20px
+      xPos = 20 + i * (textAreaWidth + 20);
+    } else {
+      // 3ポートの場合は3分割
+      textAreaWidth = (W_WIDTH - 80) / 3; // 左右のマージン20px + 間隔20pxずつ
+      xPos = 20 + i * (textAreaWidth + 20);
+    }
+    
+    // ポートラベル
+    portLabels[i] = new JLabel(portLabelTexts[i]);
+    portLabels[i].setBounds(xPos, yPos, 100, 20);
+    pane.add(portLabels[i]);
+    
+    // ポート番号入力フィールド
+    portTextFields[i] = new JTextField();
+    portTextFields[i].addKeyListener(new GuiListener(this));
+    portTextFields[i].setText(Integer.toString(portNumbers[i]));
+    portTextFields[i].setBounds(xPos, yPos + 25, 80, 25);
+    pane.add(portTextFields[i]);
+
+    // 接続ボタン
+    connectButtons[i] = new JButton("Connect");
+    connectButtons[i].addActionListener(new GuiListener(this));
+    connectButtons[i].setBounds(xPos + 85, yPos + 25, 80, 25);
+    pane.add(connectButtons[i]);
+
+    // ステータスラベル
+    portStatusLabels[i] = new JLabel("Disconnected");
+    portStatusLabels[i].setBounds(xPos, yPos + 55, 100, 20);
+    portStatusLabels[i].setForeground(Color.RED);
+    pane.add(portStatusLabels[i]);
+    
+    // ポート専用のログテキストエリア
+    if (portLogTexts[i] == null) {
+      portLogTexts[i] = new ArrayList<String>();
+    }
+    logTextAreas[i] = new JTextArea();
+    logTextAreas[i].setLineWrap(true);
+    portScrollPanes[i] = new JScrollPane(
+        logTextAreas[i],
+        JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
+        JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
+    portScrollPanes[i].setPreferredSize(new Dimension(textAreaWidth, 300));
+    portScrollPanes[i].setBounds(xPos, yPos + 80, textAreaWidth, 300);
+    pane.add(portScrollPanes[i]);
+  }
+  
+  // ボタンの有効/無効を更新
+  addPortButton.setEnabled(currentPortCount < MAX_PORTS);
+  removePortButton.setEnabled(currentPortCount > 1);
+  
+  // ポート数表示を更新
+  JLabel portCountLabel = (JLabel)pane.getComponent(2); // ポート数ラベルのインデックス
+  if (portCountLabel != null) {
+    portCountLabel.setText("Ports: " + currentPortCount);
+  }
+  
+  pane.revalidate();
+  pane.repaint();
+}
+
+/**
+ * ポートを追加
+ */
+void addPort() {
+  if (currentPortCount < MAX_PORTS) {
+    currentPortCount++;
+    updatePortDisplay();
+  }
+}
+
+/**
+ * ポートを削除
+ */
+void removePort() {
+  if (currentPortCount > 1) {
+    // 最後のポートが接続中なら切断
+    int lastIndex = currentPortCount - 1;
+    if (portConnected[lastIndex]) {
+      disconnectPort(lastIndex);
+    }
+    currentPortCount--;
+    updatePortDisplay();
   }
 }
 
@@ -291,10 +429,11 @@ void updateLogDisplay() {
 void saveConfig() {
   try {
     JSONArray ports = new JSONArray();
-    for (int i = 0; i < MAX_PORTS; i++) {
+    for (int i = 0; i < currentPortCount; i++) {
       ports.setInt(i, portNumbers[i]);
     }
     config.setJSONArray("ports", ports);
+    config.setInt("portCount", currentPortCount);
     saveJSONObject(config, dataPath("config.json"));
   } catch (Exception e) {
     logText.add(0, "[" + getFormattedDate() + "]Config save error: " + e.getMessage());

@@ -35,7 +35,20 @@ class GuiListener implements ItemListener, ChangeListener, ActionListener, KeyLi
     // clearボタンが押された
     if (e.getSource() == clearButton) {
       logText.clear();
-      logTextArea.setText("");
+      for (int i = 0; i < 3; i++) { // MAX_PORTS = 3
+        if (portLogTexts[i] != null) {
+          portLogTexts[i].clear();
+          updatePortLogDisplay(i);
+        }
+      }
+    }
+    // ポート追加ボタンが押された
+    else if (e.getSource() == addPortButton) {
+      addPort();
+    }
+    // ポート削除ボタンが押された
+    else if (e.getSource() == removePortButton) {
+      removePort();
     }
     // 接続ボタンが押された（複数ポート対応）
     else {
