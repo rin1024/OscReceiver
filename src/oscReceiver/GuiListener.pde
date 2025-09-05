@@ -37,27 +37,33 @@ class GuiListener implements ItemListener, ChangeListener, ActionListener, KeyLi
       logText.clear();
       logTextArea.setText("");
     }
-    // 接続ボタンが押された
-    else if (e.getSource() == bindButton) {
-      if (connected == true) {
-        disconnect();
-        bindButton.setText("Connect");
-        
-        logText.add(0, "[" +getFormattedDate() + "]disconnect.");
+    // 接続ボタンが押された（複数ポート対応）
+    else {
+      for (int i = 0; i < 3; i++) { // MAX_PORTS = 3
+        if (e.getSource() == connectButtons[i]) {
+          if (portConnected[i]) {
+            disconnectPort(i);
+          } else {
+            try {
+              int portNumber = Integer.parseInt(portTextFields[i].getText());
+              
+              // ポート番号の妥当性をチェック
+              if (portNumber < 1024 || portNumber > 65535) {
+                logText.add(0, "[" + getFormattedDate() + "]Invalid port number. Please use a port between 1024 and 65535.");
+                updateLogDisplay();
+                return;
+              }
+
+              connectPort(i);
+              
+            } catch (NumberFormatException ex) {
+              logText.add(0, "[" + getFormattedDate() + "]Invalid port number format. Please enter a valid number.");
+              updateLogDisplay();
+            }
+          }
+          break;
+        }
       }
-      else {
-        MY_OSC_PORT = Integer.parseInt(myPort.getText());
-
-        connect();
-        bindButton.setText("Disconnect");
-
-        logText.add(0, "[" +getFormattedDate() + "]connect osc port = " + MY_OSC_PORT);
-
-        // save last selected port
-        config.setInt("myOscPort", MY_OSC_PORT);
-        saveJSONObject(config, dataPath("config.json"));
-      }
-      logTextArea.setText(String.join("\r\n", logText));
     }
   }
 }  

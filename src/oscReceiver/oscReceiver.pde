@@ -18,6 +18,13 @@ final Logger L = Logger.getLogger(getClass());
 boolean connected = false;
 int MY_OSC_PORT = -1;
 
+// 複数ポート監視用
+final int MAX_PORTS = 3;
+OscP5[] oscServers = new OscP5[MAX_PORTS];
+int[] portNumbers = new int[MAX_PORTS];
+boolean[] portConnected = new boolean[MAX_PORTS];
+String[] portLabels = {"Port 1", "Port 2", "Port 3"};
+
 static int W_WIDTH = 720;
 static int W_HEIGHT = 410;
 
@@ -25,10 +32,11 @@ OscP5 oscP5;
 JSONObject config;
 int bgColor;
 
-JTextField myPort;
-JButton bindButton;
+JTextField[] portTextFields = new JTextField[MAX_PORTS];
+JButton[] connectButtons = new JButton[MAX_PORTS];
 JButton clearButton;
 JTextArea logTextArea;
+JLabel[] portStatusLabels = new JLabel[MAX_PORTS];
 
 ArrayList<String> logText = new ArrayList<String>();
 
@@ -54,33 +62,39 @@ void setup() {
 
   GuiListener listener = new GuiListener(this);
 
-  // 自分のポート
-  myPort = new JTextField();
-  myPort.addKeyListener(listener);
-  myPort.setText(Integer.toString(MY_OSC_PORT));
-  myPort.setBounds(
-    20, 10, 150, 30);
-  pane.add(myPort);
+  // 複数ポートのUIを作成
+  for (int i = 0; i < MAX_PORTS; i++) {
+    int yPos = 10 + i * 50;
+    
+    // ポート番号入力フィールド
+    portTextFields[i] = new JTextField();
+    portTextFields[i].addKeyListener(listener);
+    portTextFields[i].setText(Integer.toString(portNumbers[i]));
+    portTextFields[i].setBounds(20, yPos, 100, 25);
+    pane.add(portTextFields[i]);
 
-  {
-    JLabel l = new JLabel("My OSC Port");
-    l.setBounds(
-        20 + 2, 10 + 25, 150, 30);
-    pane.add(l);
+    // ポートラベル
+    JLabel portLabel = new JLabel(portLabels[i]);
+    portLabel.setBounds(20, yPos + 25, 100, 20);
+    pane.add(portLabel);
+
+    // 接続ボタン
+    connectButtons[i] = new JButton("Connect");
+    connectButtons[i].addActionListener(listener);
+    connectButtons[i].setBounds(130, yPos, 80, 25);
+    pane.add(connectButtons[i]);
+
+    // ステータスラベル
+    portStatusLabels[i] = new JLabel("Disconnected");
+    portStatusLabels[i].setBounds(220, yPos, 100, 25);
+    portStatusLabels[i].setForeground(Color.RED);
+    pane.add(portStatusLabels[i]);
   }
 
-  // 接続ボタン
-  bindButton = new JButton("Connect");
-  bindButton.addActionListener(listener);
-  bindButton.setBounds(
-    180, 10, 150, 30);
-  pane.add(bindButton);
-
   // clearボタン
-  clearButton = new JButton("Clear");
+  clearButton = new JButton("Clear All");
   clearButton.addActionListener(listener);
-  clearButton.setBounds(
-    550, 10, 150, 30);
+  clearButton.setBounds(550, 10, 150, 30);
   pane.add(clearButton);
 
   // デバッグ表示用エリア
@@ -90,13 +104,12 @@ void setup() {
       logTextArea,
       JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
       JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
-  scrollpane.setPreferredSize(new Dimension(450, 400));
+  scrollpane.setPreferredSize(new Dimension(450, 300));
   scrollpane.setBounds(
-      20, 70, 680,( height - 70) - 20);
+      20, 170, 680, (height - 170) - 20);
   pane.add(scrollpane);
 
   logTextArea.setText(String.join("\r\n", logText));
-  //logText = new ArrayList<String>();
 
   // set background color
   bgColor = canvas.getBackground().getRGB();
@@ -116,47 +129,117 @@ void draw() {
 void loadConfig() {
   config = loadJSONObject(dataPath("config.json"));
 
-  // 自分のポートを指定
-  MY_OSC_PORT = config.getInt("myOscPort");
+  // 複数ポートの設定を読み込み
+  if (config.hasKey("ports")) {
+    JSONArray ports = config.getJSONArray("ports");
+    for (int i = 0; i < MAX_PORTS && i < ports.size(); i++) {
+      portNumbers[i] = ports.getInt(i);
+    }
+  } else {
+    // デフォルトポート設定
+    portNumbers[0] = 8001;
+    portNumbers[1] = 8002;
+    portNumbers[2] = 8003;
+  }
+  
+  // 後方互換性のため
+  MY_OSC_PORT = portNumbers[0];
 }
 
 /**
  *
  */
 void connect() {
-  if (oscP5 != null) {
-    oscP5.dispose();
-    oscP5 = null;
-  }
+  // 後方互換性のため、最初のポートに接続
+  connectPort(0);
+}
 
-  // OSCの接続開始
-  OscProperties properties = new OscProperties();
-  properties.setDatagramSize(100000); //1536
-  properties.setListeningPort(MY_OSC_PORT);
-  oscP5 = new OscP5(this, properties);
-  connected = true;
+void connectPort(int portIndex) {
+  if (portIndex < 0 || portIndex >= MAX_PORTS) return;
+  
+  try {
+    // 既存の接続があれば切断
+    if (oscServers[portIndex] != null) {
+      disconnectPort(portIndex);
+    }
+
+    // ポート番号を取得
+    int portNumber = Integer.parseInt(portTextFields[portIndex].getText());
+    portNumbers[portIndex] = portNumber;
+
+    // OSCの接続開始
+    OscProperties properties = new OscProperties();
+    properties.setDatagramSize(100000);
+    properties.setListeningPort(portNumber);
+    oscServers[portIndex] = new OscP5(this, properties);
+    portConnected[portIndex] = true;
+    
+    // UI更新
+    connectButtons[portIndex].setText("Disconnect");
+    portStatusLabels[portIndex].setText("Connected");
+    portStatusLabels[portIndex].setForeground(Color.GREEN);
+    
+    logText.add(0, "[" + getFormattedDate() + "]Port " + (portIndex + 1) + " connected on " + portNumber);
+    updateLogDisplay();
+    
+    // 設定を保存
+    saveConfig();
+    
+  } catch (Exception e) {
+    logText.add(0, "[" + getFormattedDate() + "]Port " + (portIndex + 1) + " connection failed: " + e.getMessage());
+    updateLogDisplay();
+  }
 }
 
 /**
  *
  */
 void disconnect() {
-  if (oscP5 != null) {
-    oscP5.dispose();
-    oscP5 = null;
+  // 後方互換性のため、最初のポートを切断
+  disconnectPort(0);
+}
+
+void disconnectPort(int portIndex) {
+  if (portIndex < 0 || portIndex >= MAX_PORTS) return;
+  
+  if (oscServers[portIndex] != null) {
+    oscServers[portIndex].dispose();
+    oscServers[portIndex] = null;
+    portConnected[portIndex] = false;
+    
+    // UI更新
+    connectButtons[portIndex].setText("Connect");
+    portStatusLabels[portIndex].setText("Disconnected");
+    portStatusLabels[portIndex].setForeground(Color.RED);
+    
+    logText.add(0, "[" + getFormattedDate() + "]Port " + (portIndex + 1) + " disconnected");
+    updateLogDisplay();
   }
-  connected = false;
+}
+
+void disconnectAll() {
+  for (int i = 0; i < MAX_PORTS; i++) {
+    disconnectPort(i);
+  }
 }
 
 /**
  *
  */
 void oscEvent(OscMessage _msg) {
-  logText.add(0, "[" +getFormattedDate() + "]" + parseOscMessageToString(_msg));
-  logTextArea.setText(String.join("\r\n", logText));
-  if (logText.size() > 1000) {
-    logText.remove(logText.size() - 1);
+  // どのポートからメッセージが来たかを特定
+  int sourcePort = -1;
+  for (int i = 0; i < MAX_PORTS; i++) {
+    if (oscServers[i] != null && portConnected[i]) {
+      // ポート番号で特定（簡易実装）
+      sourcePort = portNumbers[i];
+      break;
+    }
   }
+  
+  String portInfo = sourcePort > 0 ? "[Port " + sourcePort + "] " : "";
+  logText.add(0, "[" + getFormattedDate() + "]" + portInfo + parseOscMessageToString(_msg));
+  updateLogDisplay();
 }
 
 /**
@@ -188,4 +271,32 @@ String getFormattedDate() {
   DateFormat format = new SimpleDateFormat("yyyy/MM/dd hh:mm:ss.SSS");
   String date = format.format(new Date());
   return date;
+}
+
+/**
+ * ログ表示を更新
+ */
+void updateLogDisplay() {
+  if (logTextArea != null) {
+    logTextArea.setText(String.join("\r\n", logText));
+    if (logText.size() > 1000) {
+      logText.remove(logText.size() - 1);
+    }
+  }
+}
+
+/**
+ * 設定を保存
+ */
+void saveConfig() {
+  try {
+    JSONArray ports = new JSONArray();
+    for (int i = 0; i < MAX_PORTS; i++) {
+      ports.setInt(i, portNumbers[i]);
+    }
+    config.setJSONArray("ports", ports);
+    saveJSONObject(config, dataPath("config.json"));
+  } catch (Exception e) {
+    logText.add(0, "[" + getFormattedDate() + "]Config save error: " + e.getMessage());
+  }
 }
