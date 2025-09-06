@@ -38,7 +38,7 @@ public class OscReceiverConfig {
 
   public OscReceiverConfig(PApplet _parent) {
     parent = _parent;
-    systemConfig = new SystemConfigManager();
+    systemConfig = new SystemConfigManager(parent);
     
     // デフォルトポート設定をコピー
     System.arraycopy(DEFAULT_PORTS, 0, portNumbers, 0, DEFAULT_PORTS.length);
@@ -51,17 +51,17 @@ public class OscReceiverConfig {
     String logDir = systemConfig.getLogDirectory();
     String configDir = systemConfig.getConfigDirectory();
     
-    L.info("設定ディレクトリ: " + configDir);
-    L.info("ログディレクトリ: " + logDir);
+    System.out.println("設定ディレクトリ: " + configDir);
+    System.out.println("ログディレクトリ: " + logDir);
 
     // 設定ディレクトリの初期化
     if (!systemConfig.createConfigDirectory()) {
-      L.error("設定ディレクトリの作成に失敗しました: " + systemConfig.getConfigDirectory());
+      System.out.println("設定ディレクトリの作成に失敗しました: " + systemConfig.getConfigDirectory());
     }
     
     // ログディレクトリの初期化
     if (!systemConfig.createLogDirectory()) {
-      L.error("ログディレクトリの作成に失敗しました: " + systemConfig.getLogDirectory());
+      System.out.println("ログディレクトリの作成に失敗しました: " + systemConfig.getLogDirectory());
     }
     
     System.setProperty("logging.dir", logDir);
@@ -72,7 +72,7 @@ public class OscReceiverConfig {
     // log4j.propertiesファイルが存在しない場合は作成
     File log4jFile = new File(log4jPath);
     if (log4jFile.exists()) {
-      L.info("✓ log4j.propertiesファイルが見つかりました");
+      System.out.println("✓ log4j.propertiesファイルが見つかりました");
     }
     
     // log4jの設定を読み込み
@@ -96,7 +96,7 @@ public class OscReceiverConfig {
     if (configFile.exists()) {
       try {
         jsonConfig = parent.loadJSONObject(configPath);
-        L.info("設定ファイルを読み込みました: " + configPath);
+        L.info("設定ファイルを読み込みました。 ");
       } catch (Exception e) {
         L.error("設定ファイルの読み込みに失敗しました: " + e.getMessage());
         jsonConfig = createDefaultConfig();
