@@ -1,3 +1,12 @@
 {
-  "myOscPort": 8001
+  "portCount": 3,
+  "ports": [
+    8091,
+    8002,
+    8003
+  ],
+  "windowX": 100,
+  "windowY": 100,
+  "windowWidth": 800,
+  "windowHeight": 450
 }
