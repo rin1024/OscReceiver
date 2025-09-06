@@ -27,6 +27,7 @@ boolean[] portConnected = new boolean[MAX_PORTS];
 String[] portLabelTexts = {"Port 1", "Port 2", "Port 3"};
 int currentPortCount = 1; // 現在表示されているポート数
 
+
 OscP5 oscP5;
 OscReceiverConfig config;
 int bgColor;
@@ -143,12 +144,20 @@ void connectPort(int portIndex) {
     int portNumber = Integer.parseInt(portTextFields[portIndex].getText());
     portNumbers[portIndex] = portNumber;
 
-    // OSCの接続開始
+    System.out.println("[DEBUG] Connecting port " + (portIndex + 1) + " on port number " + portNumber);
+
+    // OSCの接続開始（各ポートに個別のリスナーを設定）
     OscProperties properties = new OscProperties();
     properties.setDatagramSize(100000);
     properties.setListeningPort(portNumber);
-    oscServers[portIndex] = new OscP5(this, properties);
+    
+    // 各ポートに専用のリスナークラスを作成
+    PortSpecificListener listener = new PortSpecificListener(portIndex);
+    oscServers[portIndex] = new OscP5(listener, properties);
+    
     portConnected[portIndex] = true;
+    
+    System.out.println("[DEBUG] Port " + (portIndex + 1) + " connected successfully on port " + portNumber);
 
     // UI更新
     connectButtons[portIndex].setText("Disconnect");
@@ -203,33 +212,71 @@ void disconnectAll() {
 }
 
 /**
- *
+ * 各ポート専用のOSCリスナークラス
  */
-void oscEvent(OscMessage _msg) {
-  // どのポートからメッセージが来たかを特定
-  int sourcePortIndex = -1;
-  for (int i = 0; i < MAX_PORTS; i++) {
-    if (oscServers[i] != null && portConnected[i]) {
-      sourcePortIndex = i;
-      break;
-    }
+class PortSpecificListener {
+  private int portIndex;
+  
+  public PortSpecificListener(int _portIndex) {
+    portIndex = _portIndex;
   }
-
-  if (sourcePortIndex >= 0) {
+  
+  /**
+   * OSCメッセージを受信した時のコールバック
+   */
+  void oscEvent(OscMessage _msg) {
+    // デバッグ情報を追加
+    String debugInfo = "[DEBUG] Port " + (portIndex + 1) + " received message";
+    System.out.println(debugInfo);
+    
     String logEntry = "[" + getFormattedDate() + "]" + parseOscMessageToString(_msg);
+    String debugLogEntry = "[" + getFormattedDate() + "][Port " + (portIndex + 1) + "]" + parseOscMessageToString(_msg);
 
-    // 該当ポートのログに追加
-    portLogTexts[sourcePortIndex].add(0, logEntry);
+    // 該当ポートのログに追加（デバッグ情報付き）
+    portLogTexts[portIndex].add(0, debugLogEntry);
 
     // ログサイズを制限
-    if (portLogTexts[sourcePortIndex].size() > 100) {
-      portLogTexts[sourcePortIndex].remove(portLogTexts[sourcePortIndex].size() - 1);
+    if (portLogTexts[portIndex].size() > 100) {
+      portLogTexts[portIndex].remove(portLogTexts[portIndex].size() - 1);
     }
 
     // 該当ポートのテキストエリアを更新
-    updatePortLogDisplay(sourcePortIndex);
+    updatePortLogDisplay(portIndex);
+  }
+  
+  /**
+   * OSCで送受信[した|してる]パラメータを文字列にパース
+   */
+  String parseOscMessageToString(OscMessage _msg) {
+    String _addr = _msg.addrPattern();
+    Object[] _list = _msg.arguments();
+
+    String txt = _addr + ": ";
+    for (int i=0; i<_list.length; i++) {
+      try {
+        txt += "[" + Integer.valueOf((String) _list[i]) + "]";
+      }
+      catch (Exception e) {
+        try {
+          txt += "[" + _list[i].toString() + "]";
+        }
+        catch (Exception e2) {
+          logText.add("[parseOscMessageToString exception]" + e2);
+        }
+      }
+      txt += ",  ";
+    }
+    return txt;
+  }
+
+  String getFormattedDate() {
+    DateFormat format = new SimpleDateFormat("yyyy/MM/dd hh:mm:ss.SSS");
+    String date = format.format(new Date());
+    return date;
   }
 }
+
+
 
 /**
  * OSCで送受信[した|してる]パラメータを文字列にパース
